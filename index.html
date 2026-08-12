@@ -1,0 +1,1572 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yasmin CRM - Customer Service & Lead Tracking</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              900: '#14532d',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Font: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- SheetJS & PapaParse for Excel/CSV Handling -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .kanban-col-scroll::-webkit-scrollbar { width: 6px; }
+    .kanban-col-scroll::-webkit-scrollbar-track { background: transparent; }
+    .kanban-col-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    .dragging { opacity: 0.5; scale: 0.98; }
+    .drag-over { background-color: #f1f5f9; border: 2px dashed #3b82f6 !important; }
+  </style>
+</head>
+<body class="h-full flex flex-col text-slate-800 bg-slate-100">
+
+  <!-- Top Navigation Bar -->
+  <header class="bg-slate-900 text-white sticky top-0 z-30 shadow-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <!-- Logo & Title -->
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center font-bold text-xl shadow-lg shadow-emerald-500/30">
+            <i class="fa-solid fa-chart-line text-white"></i>
+          </div>
+          <div>
+            <h1 class="font-bold text-lg leading-none tracking-tight">Nexus<span class="text-emerald-400">CRM</span></h1>
+            <p class="text-xs text-slate-400 mt-0.5">CS Lead Tracking & Sales Funnel</p>
+          </div>
+        </div>
+
+        <!-- Right Side Controls -->
+        <div class="flex items-center space-x-3">
+          
+          <!-- Stale Lead Reminder Badge -->
+          <div class="relative">
+            <button id="btnNotif" onclick="toggleNotifDropdown()" class="p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg relative transition" title="Pengingat Follow-up">
+              <i class="fa-solid fa-bell text-lg"></i>
+              <span id="notifBadge" class="hidden absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-slate-900 animate-pulse">0</span>
+            </button>
+            
+            <!-- Notification Dropdown -->
+            <div id="notifDropdown" class="hidden absolute right-0 mt-2 w-80 sm:w-96 bg-white text-slate-800 rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden">
+              <div class="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                <h3 class="font-semibold text-sm text-slate-700"><i class="fa-solid fa-clock-rotate-left text-amber-500 mr-2"></i>Perlu Follow-Up!</h3>
+                <span id="notifCountText" class="text-xs text-slate-500">0 Lead Stagnan</span>
+              </div>
+              <div id="notifList" class="max-h-80 overflow-y-auto divide-y divide-slate-100 text-xs"></div>
+            </div>
+          </div>
+
+          <!-- User Switcher -->
+          <div class="flex items-center bg-slate-800 rounded-lg p-1 border border-slate-700">
+            <i class="fa-solid fa-circle-user text-emerald-400 ml-2 mr-1.5 text-sm"></i>
+            <select id="userSelect" onchange="changeActiveUser(this.value)" class="bg-transparent text-xs text-slate-200 focus:outline-none font-medium pr-2 cursor-pointer">
+              <option value="Admin" class="bg-slate-800 text-white">Admin (Semua Data)</option>
+              <option value="Yasmin CS" class="bg-slate-800 text-white">Yasmin (Staff CS)</option>
+            </select>
+          </div>
+
+          <!-- Quick Add Button -->
+          <button onclick="openLeadModal()" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3.5 py-2 rounded-lg text-xs font-semibold shadow-md shadow-emerald-500/20 flex items-center transition active:scale-95">
+            <i class="fa-solid fa-plus mr-1.5"></i> Lead Baru
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Navigation Tabs -->
+    <div class="bg-slate-800/80 backdrop-blur border-t border-slate-700/50 px-4 sm:px-6 lg:px-8">
+      <div class="max-w-7xl mx-auto flex space-x-2 sm:space-x-6 overflow-x-auto py-2 text-xs font-medium">
+        <button onclick="switchTab('pipeline')" id="tab-pipeline" class="tab-btn active-tab px-3 py-1.5 rounded-lg flex items-center text-emerald-400 bg-slate-900/60 font-semibold transition">
+          <i class="fa-solid fa-list-check mr-2"></i> Pipeline Sales (Kanban)
+        </button>
+        <button onclick="switchTab('table')" id="tab-table" class="tab-btn px-3 py-1.5 rounded-lg flex items-center text-slate-400 hover:text-white hover:bg-slate-700/50 transition">
+          <i class="fa-solid fa-table-cells mr-2"></i> Tabel Lead
+        </button>
+        <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn px-3 py-1.5 rounded-lg flex items-center text-slate-400 hover:text-white hover:bg-slate-700/50 transition">
+          <i class="fa-solid fa-chart-pie mr-2"></i> Dashboard & Analytics
+        </button>
+        <button onclick="switchTab('products')" id="tab-products" class="tab-btn px-3 py-1.5 rounded-lg flex items-center text-slate-400 hover:text-white hover:bg-slate-700/50 transition">
+          <i class="fa-solid fa-boxes-stacked mr-2"></i> Katalog Produk
+        </button>
+        <button onclick="switchTab('import-export')" id="tab-import-export" class="tab-btn px-3 py-1.5 rounded-lg flex items-center text-slate-400 hover:text-white hover:bg-slate-700/50 transition">
+          <i class="fa-solid fa-file-excel mr-2"></i> Integrasi & Excel
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- Global Filter & Search Bar -->
+    <div id="filterBar" class="bg-white rounded-xl shadow-sm border border-slate-200 p-3.5 mb-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+        <div class="relative md:col-span-2">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
+          <input type="text" id="searchInput" oninput="applyFilters()" placeholder="Cari nama, HP, produk diminati, catatan..." class="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 focus:bg-white transition">
+        </div>
+        <div>
+          <select id="filterSource" onchange="applyFilters()" class="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:ring-2 focus:ring-emerald-500 transition">
+            <option value="">Semua Sumber Lead</option>
+            <option value="Instagram">Instagram</option>
+            <option value="WhatsApp">WhatsApp</option>
+            <option value="Website">Website</option>
+            <option value="Referral">Referral</option>
+            <option value="Marketplace">Marketplace</option>
+            <option value="Lainnya">Lainnya</option>
+          </select>
+        </div>
+        <div>
+          <select id="filterPic" onchange="applyFilters()" class="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 focus:ring-2 focus:ring-emerald-500 transition">
+            <option value="">Semua Staff PIC</option>
+            <option value="Yasmin CS">Yasmin CS</option>
+          </select>
+        </div>
+        <div>
+          <button onclick="resetFilters()" class="w-full py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-medium transition flex items-center justify-center">
+            <i class="fa-solid fa-rotate-left mr-1.5"></i> Reset Filter
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 1: KANBAN PIPELINE -->
+    <div id="view-pipeline" class="tab-content">
+      <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-start">
+        <!-- Stage 1: Awareness -->
+        <div class="bg-slate-200/60 rounded-xl p-3 border border-slate-200 flex flex-col h-[calc(100vh-230px)] min-h-[500px]">
+          <div class="flex items-center justify-between pb-2 mb-2 border-b-2 border-sky-500">
+            <span class="font-bold text-slate-700 text-xs uppercase tracking-wider flex items-center">
+              <span class="w-2.5 h-2.5 rounded-full bg-sky-500 mr-2"></span> 1. Awareness
+            </span>
+            <span id="count-awareness" class="bg-sky-100 text-sky-700 text-xs font-bold px-2 py-0.5 rounded-full">0</span>
+          </div>
+          <div id="col-awareness" data-stage="awareness" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)" class="kanban-col-scroll flex-1 overflow-y-auto space-y-2.5 pr-1 transition-all"></div>
+          <div class="mt-2 text-right text-[11px] font-semibold text-slate-500" id="total-awareness">Rp 0</div>
+        </div>
+
+        <!-- Stage 2: Consideration -->
+        <div class="bg-slate-200/60 rounded-xl p-3 border border-slate-200 flex flex-col h-[calc(100vh-230px)] min-h-[500px]">
+          <div class="flex items-center justify-between pb-2 mb-2 border-b-2 border-amber-500">
+            <span class="font-bold text-slate-700 text-xs uppercase tracking-wider flex items-center">
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-500 mr-2"></span> 2. Consideration
+            </span>
+            <span id="count-consideration" class="bg-amber-100 text-amber-700 text-xs font-bold px-2 py-0.5 rounded-full">0</span>
+          </div>
+          <div id="col-consideration" data-stage="consideration" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)" class="kanban-col-scroll flex-1 overflow-y-auto space-y-2.5 pr-1 transition-all"></div>
+          <div class="mt-2 text-right text-[11px] font-semibold text-slate-500" id="total-consideration">Rp 0</div>
+        </div>
+
+        <!-- Stage 3: Conversion -->
+        <div class="bg-slate-200/60 rounded-xl p-3 border border-slate-200 flex flex-col h-[calc(100vh-230px)] min-h-[500px]">
+          <div class="flex items-center justify-between pb-2 mb-2 border-b-2 border-emerald-500">
+            <span class="font-bold text-slate-700 text-xs uppercase tracking-wider flex items-center">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-2"></span> 3. Conversion
+            </span>
+            <span id="count-conversion" class="bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded-full">0</span>
+          </div>
+          <div id="col-conversion" data-stage="conversion" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)" class="kanban-col-scroll flex-1 overflow-y-auto space-y-2.5 pr-1 transition-all"></div>
+          <div class="mt-2 text-right text-[11px] font-semibold text-slate-500" id="total-conversion">Rp 0</div>
+        </div>
+
+        <!-- Stage 4: Retention -->
+        <div class="bg-slate-200/60 rounded-xl p-3 border border-slate-200 flex flex-col h-[calc(100vh-230px)] min-h-[500px]">
+          <div class="flex items-center justify-between pb-2 mb-2 border-b-2 border-indigo-500">
+            <span class="font-bold text-slate-700 text-xs uppercase tracking-wider flex items-center">
+              <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 mr-2"></span> 4. Retention
+            </span>
+            <span id="count-retention" class="bg-indigo-100 text-indigo-700 text-xs font-bold px-2 py-0.5 rounded-full">0</span>
+          </div>
+          <div id="col-retention" data-stage="retention" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)" class="kanban-col-scroll flex-1 overflow-y-auto space-y-2.5 pr-1 transition-all"></div>
+          <div class="mt-2 text-right text-[11px] font-semibold text-slate-500" id="total-retention">Rp 0</div>
+        </div>
+
+        <!-- Stage 5: Advocacy -->
+        <div class="bg-slate-200/60 rounded-xl p-3 border border-slate-200 flex flex-col h-[calc(100vh-230px)] min-h-[500px]">
+          <div class="flex items-center justify-between pb-2 mb-2 border-b-2 border-rose-500">
+            <span class="font-bold text-slate-700 text-xs uppercase tracking-wider flex items-center">
+              <span class="w-2.5 h-2.5 rounded-full bg-rose-500 mr-2"></span> 5. Advocacy
+            </span>
+            <span id="count-advocacy" class="bg-rose-100 text-rose-700 text-xs font-bold px-2 py-0.5 rounded-full">0</span>
+          </div>
+          <div id="col-advocacy" data-stage="advocacy" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event)" class="kanban-col-scroll flex-1 overflow-y-auto space-y-2.5 pr-1 transition-all"></div>
+          <div class="mt-2 text-right text-[11px] font-semibold text-slate-500" id="total-advocacy">Rp 0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 2: TABLE LEAD DATA -->
+    <div id="view-table" class="tab-content hidden">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-center gap-3">
+          <h2 class="font-bold text-slate-700 text-sm flex items-center">
+            <i class="fa-solid fa-list text-emerald-500 mr-2"></i> Daftar Lengkap Data Lead
+          </h2>
+          <div class="text-xs text-slate-500">
+            Total Record: <span id="tableRecordCount" class="font-bold text-slate-800">0</span>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-600 border-collapse">
+            <thead class="bg-slate-100 text-slate-700 font-semibold uppercase tracking-wider text-[11px] border-b border-slate-200">
+              <tr>
+                <th class="py-3 px-4">Tgl Lead</th>
+                <th class="py-3 px-4">Nama Pelanggan</th>
+                <th class="py-3 px-4">WhatsApp / HP</th>
+                <th class="py-3 px-4">Sumber</th>
+                <th class="py-3 px-4"><i class="fa-solid fa-heart text-amber-500 mr-1"></i> Produk Diminati</th>
+                <th class="py-3 px-4"><i class="fa-solid fa-bag-shopping text-emerald-500 mr-1"></i> Produk Dibeli</th>
+                <th class="py-3 px-4 text-right">Potongan Diskon</th>
+                <th class="py-3 px-4 text-right">Harga Akhir (Nett)</th>
+                <th class="py-3 px-4">Tahap Pipeline</th>
+                <th class="py-3 px-4">PIC Staff</th>
+                <th class="py-3 px-4 text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="leadTableBody" class="divide-y divide-slate-100"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 3: DASHBOARD & REPORTING -->
+    <div id="view-dashboard" class="tab-content hidden">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-slate-500">Total Leads Inbound</p>
+            <h3 id="statTotalLeads" class="text-2xl font-bold text-slate-800 mt-1">0</h3>
+            <p class="text-[11px] text-emerald-600 font-medium mt-1"><i class="fa-solid fa-arrow-trend-up mr-1"></i> Aktif di funnel</p>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
+            <i class="fa-solid fa-users"></i>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-slate-500">Total Penjualan (Closing)</p>
+            <h3 id="statTotalSales" class="text-2xl font-bold text-slate-800 mt-1">Rp 0</h3>
+            <p class="text-[11px] text-slate-500 mt-1">Status Conversion & Retention</p>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl">
+            <i class="fa-solid fa-sack-dollar"></i>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-slate-500">Conversion Rate</p>
+            <h3 id="statConversionRate" class="text-2xl font-bold text-slate-800 mt-1">0%</h3>
+            <p class="text-[11px] text-emerald-600 font-medium mt-1"><i class="fa-solid fa-bullseye mr-1"></i> Lead sukses beli</p>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl">
+            <i class="fa-solid fa-chart-line"></i>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p class="text-xs font-medium text-slate-500">Perlu Follow Up (>3 Hari)</p>
+            <h3 id="statStaleLeads" class="text-2xl font-bold text-amber-600 mt-1">0</h3>
+            <p class="text-[11px] text-amber-600 font-medium mt-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Perlu perhatian</p>
+          </div>
+          <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
+            <i class="fa-solid fa-hourglass-half"></i>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <h3 class="font-bold text-slate-700 text-sm mb-4 flex items-center">
+            <i class="fa-solid fa-filter text-sky-500 mr-2"></i> Distribution Sales Funnel Pipeline
+          </h3>
+          <div class="h-64 relative">
+            <canvas id="funnelChart"></canvas>
+          </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <h3 class="font-bold text-slate-700 text-sm mb-4 flex items-center">
+            <i class="fa-solid fa-chart-pie text-emerald-500 mr-2"></i> Kontribusi Penjualan per Sumber Lead
+          </h3>
+          <div class="h-64 relative">
+            <canvas id="sourceChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="font-bold text-slate-700 text-sm flex items-center">
+              <i class="fa-solid fa-comments text-amber-500 mr-2"></i> Produk Paling Banyak Diminati Customer
+            </h3>
+            <span class="text-[10px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-semibold border border-amber-200">Demand Radar</span>
+          </div>
+          <div class="h-64 relative">
+            <canvas id="askedProductChart"></canvas>
+          </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <h3 class="font-bold text-slate-700 text-sm mb-4 flex items-center">
+              <i class="fa-solid fa-trophy text-amber-500 mr-2"></i> Ranking Produk Terlaris (Closing)
+            </h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs text-slate-600">
+                <thead class="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
+                  <tr>
+                    <th class="py-2.5 px-4">#</th>
+                    <th class="py-2.5 px-4">Nama Produk</th>
+                    <th class="py-2.5 px-4 text-center">Jumlah Terjual (Qty)</th>
+                    <th class="py-2.5 px-4 text-right">Total Revenue</th>
+                  </tr>
+                </thead>
+                <tbody id="topProductsBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 4: PRODUCT CATALOG -->
+    <div id="view-products" class="tab-content hidden">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+        <div class="flex justify-between items-center mb-5 pb-3 border-b border-slate-200">
+          <div>
+            <h2 class="font-bold text-slate-800 text-base">Katalog Produk & Layanan</h2>
+            <p class="text-xs text-slate-500">Atur master produk dan harga dasar untuk pilihan input lead transaksi CS</p>
+          </div>
+          <button onclick="openAddProductModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center shadow-sm">
+            <i class="fa-solid fa-plus mr-1.5"></i> Tambah Produk
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" id="productListGrid"></div>
+      </div>
+    </div>
+
+    <!-- VIEW 5: IMPORT / EXPORT -->
+    <div id="view-import-export" class="tab-content hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white p-6 rounded-xl border-2 border-emerald-500 shadow-md lg:col-span-2 relative overflow-hidden">
+          <div class="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg uppercase tracking-wider">
+            Integrasi Langsung 2-Arah
+          </div>
+          <div class="flex items-center space-x-3 mb-3">
+            <div class="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-arrows-spin"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-slate-800 text-base">Sinkronisasi Google Sheets (Apps Script Webhook)</h3>
+              <p class="text-xs text-slate-500">Kirim data lead CRM ke Google Spreadsheet atau tarik data terbaru langsung secara real-time</p>
+            </div>
+          </div>
+
+          <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3 text-xs">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">URL Webhook Google Apps Script Deployment:</label>
+              <div class="flex gap-2">
+                <input type="text" id="gSheetWebhookUrl" placeholder="https://script.google.com/macros/s/AKfycbx.../exec" class="flex-1 px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 font-mono">
+                <button onclick="saveGSheetUrl()" class="bg-slate-800 hover:bg-slate-900 text-white px-3 py-2 rounded-lg font-semibold text-xs transition">
+                  Simpan URL
+                </button>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between pt-2 border-t border-slate-200 gap-2">
+              <div class="flex space-x-2">
+                <button onclick="syncToGoogleSheets()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-semibold flex items-center shadow-sm transition active:scale-95">
+                  <i class="fa-solid fa-cloud-arrow-up mr-2"></i> Push / Kirim Ke Sheets
+                </button>
+                <button onclick="pullFromGoogleSheets()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold flex items-center shadow-sm transition active:scale-95">
+                  <i class="fa-solid fa-cloud-arrow-down mr-2"></i> Pull / Tarik Dari Sheets
+                </button>
+              </div>
+
+              <label class="inline-flex items-center text-xs text-slate-600 cursor-pointer">
+                <input type="checkbox" id="chkAutoSync" onchange="toggleAutoSync(this.checked)" class="rounded text-emerald-600 focus:ring-emerald-500 mr-2">
+                Auto-Sync saat update data
+              </label>
+            </div>
+
+            <div id="gsheetSyncStatus" class="text-[11px] font-medium text-slate-500 pt-1">
+              Status: Belum tersinkronisasi
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center text-xl mb-4">
+            <i class="fa-solid fa-file-excel"></i>
+          </div>
+          <h3 class="font-bold text-slate-800 text-base">Ekspor Data Lead (Excel / CSV)</h3>
+          <p class="text-xs text-slate-500 mt-1 mb-4">Unduh seluruh database lead atau hasil filter yang sedang aktif dalam format Excel (.xlsx) atau .csv</p>
+          
+          <div class="space-y-3">
+            <button onclick="exportToExcel()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center justify-center shadow-sm transition">
+              <i class="fa-solid fa-download mr-2"></i> Ekspor ke File Excel (.xlsx)
+            </button>
+            <button onclick="exportToCSV()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold flex items-center justify-center transition">
+              <i class="fa-solid fa-file-csv mr-2"></i> Ekspor ke Format CSV
+            </button>
+          </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+          <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center text-xl mb-4">
+            <i class="fa-solid fa-file-import"></i>
+          </div>
+          <h3 class="font-bold text-slate-800 text-base">Bulk Import Data Lead</h3>
+          <p class="text-xs text-slate-500 mt-1 mb-4">Upload file Excel atau CSV berisi data lead lama dengan pemetaan kolom otomatis</p>
+          
+          <div class="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:bg-slate-50 transition cursor-pointer" onclick="document.getElementById('importFileInput').click()">
+            <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 mb-2"></i>
+            <p class="text-xs font-medium text-slate-700">Klik untuk memilih file Excel (.xlsx) / CSV</p>
+            <p class="text-[11px] text-slate-400 mt-1">Mendukung format standar lead spreadsheet</p>
+            <input type="file" id="importFileInput" onchange="handleFileImport(event)" accept=".xlsx, .xls, .csv" class="hidden">
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL 1: ADD / EDIT LEAD & MULTI-PRODUCT WITH DISCOUNT -->
+  <div id="leadModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden transform transition-all my-8">
+      <!-- Modal Header -->
+      <div class="bg-slate-900 text-white px-6 py-4 flex justify-between items-center">
+        <h3 id="modalLeadTitle" class="font-bold text-base flex items-center">
+          <i class="fa-solid fa-user-plus text-emerald-400 mr-2"></i> Input Data Lead / Customer Baru
+        </h3>
+        <button onclick="closeLeadModal()" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <!-- Modal Body Form -->
+      <form id="leadForm" onsubmit="saveLead(event)" class="p-6 space-y-4 max-h-[85vh] overflow-y-auto text-xs">
+        <input type="hidden" id="leadId">
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">
+              <i class="fa-regular fa-calendar text-emerald-600 mr-1"></i> Tanggal Lead <span class="text-rose-500">*</span>
+            </label>
+            <input type="date" id="leadDate" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white font-medium">
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Nama Pelanggan <span class="text-rose-500">*</span></label>
+            <input type="text" id="leadName" required placeholder="Contoh: Budi Santoso" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500">
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Nomor HP / WhatsApp <span class="text-rose-500">*</span></label>
+            <input type="tel" id="leadPhone" required placeholder="Contoh: 08123456789" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500">
+          </div>
+        </div>
+
+        <!-- FIELD: Produk Diminati -->
+        <div class="bg-amber-50/70 p-3 rounded-xl border border-amber-200/80 space-y-1">
+          <label class="font-bold text-amber-900 block text-xs flex items-center">
+            <i class="fa-solid fa-heart text-amber-600 mr-1.5 text-sm"></i> Produk Diminati Customer (Inquiry) <span class="text-rose-500 ml-1">*</span>
+          </label>
+          <input type="text" id="leadAskedProduct" required placeholder="Contoh: Paket Brightening Cream, Serum Acne, dll" class="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500">
+        </div>
+
+        <!-- SECTION DYNAMIC MULTI-PRODUCT TRANSACTION (PRODUK DIBELI) -->
+        <div class="border border-slate-200 rounded-xl p-3.5 bg-slate-50 space-y-3">
+          <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+            <span class="font-bold text-slate-800 text-xs flex items-center">
+              <i class="fa-solid fa-basket-shopping text-emerald-600 mr-1.5"></i> Detail Transaksi (Produk Dibeli & Diskon)
+            </span>
+            <button type="button" onclick="addProductRow()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded text-[11px] font-semibold flex items-center transition">
+              <i class="fa-solid fa-plus mr-1"></i> Tambah Produk Dibeli
+            </button>
+          </div>
+
+          <!-- Container Baris Produk -->
+          <div id="productRowsContainer" class="space-y-2"></div>
+
+          <!-- SUMMARY & DISKON TOTAL CARD -->
+          <div class="bg-emerald-50/80 border border-emerald-200 rounded-xl p-3.5 mt-3">
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-center text-center">
+              <div>
+                <span class="block text-[10px] uppercase font-bold text-slate-500">Subtotal Harga</span>
+                <span id="displaySubtotal" class="font-bold text-slate-800 text-sm">Rp 0</span>
+              </div>
+
+              <div>
+                <span class="block text-[10px] uppercase font-bold text-slate-500 mb-1">Diskon Global / Transaksi</span>
+                <div class="flex items-center space-x-1 justify-center">
+                  <select id="globalDiscountType" onchange="calculateCart()" class="px-1.5 py-1 border border-emerald-300 rounded text-xs bg-white">
+                    <option value="percent">% Persen</option>
+                    <option value="nominal">Rp Nominal</option>
+                  </select>
+                  <input type="number" id="globalDiscountVal" min="0" value="0" oninput="calculateCart()" class="w-16 px-1.5 py-1 border border-emerald-300 rounded text-xs text-center bg-white font-semibold">
+                </div>
+              </div>
+
+              <div>
+                <span class="block text-[10px] uppercase font-bold text-slate-500">Total Potongan Diskon</span>
+                <span id="displayTotalDiscount" class="font-bold text-rose-600 text-sm">- Rp 0</span>
+              </div>
+
+              <div>
+                <span class="block text-[10px] uppercase font-bold text-emerald-800">Harga Akhir (Nett)</span>
+                <span id="displayFinalNett" class="font-extrabold text-emerald-600 text-base">Rp 0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Sumber Lead / Channel <span class="text-rose-500">*</span></label>
+            <select id="leadSource" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white">
+              <option value="WhatsApp">WhatsApp Ads / Direct</option>
+              <option value="Instagram">Instagram DM / Bio</option>
+              <option value="Website">Website Form</option>
+              <option value="Referral">Referral / Teman</option>
+              <option value="Marketplace">Marketplace (Shopee/Tokopedia)</option>
+              <option value="Lainnya">Lainnya</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Penanggung Jawab (PIC Staff) <span class="text-rose-500">*</span></label>
+            <select id="leadPic" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white">
+              <option value="Yasmin CS">Yasmin CS</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Tahap Sales Pipeline <span class="text-rose-500">*</span></label>
+            <select id="leadStage" required class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white font-semibold text-emerald-700">
+              <option value="awareness">1. Awareness (Tanya-tanya)</option>
+              <option value="consideration">2. Consideration (Minta Penawaran/Harga)</option>
+              <option value="conversion">3. Conversion (Sudah Beli / Closing)</option>
+              <option value="retention">4. Retention (Repeat Order)</option>
+              <option value="advocacy">5. Advocacy (Rekomendasi / Loyal)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Status Pembayaran</label>
+            <select id="leadPaymentStatus" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white">
+              <option value="Belum Bayar">Belum Bayar</option>
+              <option value="Lunas">Lunas</option>
+              <option value="DP / Uang Muka">DP / Uang Muka</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Catatan Follow-Up & Respon Customer</label>
+          <textarea id="leadNotes" rows="2" placeholder="Tuliskan perkembangan chat, keluhan, atau alasan customer belum closing..." class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500"></textarea>
+        </div>
+
+        <div class="flex justify-end space-x-3 pt-3 border-t border-slate-200">
+          <button type="button" onclick="closeLeadModal()" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-100 font-medium">Batal</button>
+          <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow-md shadow-emerald-600/20">Simpan Data Lead</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 2: ADD PRODUCT CATALOG -->
+  <div id="productModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+      <div class="bg-slate-900 text-white px-6 py-4 flex justify-between items-center">
+        <h3 class="font-bold text-base flex items-center">
+          <i class="fa-solid fa-box text-emerald-400 mr-2"></i> Tambah Katalog Produk
+        </h3>
+        <button onclick="closeProductModal()" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form id="productForm" onsubmit="saveProduct(event)" class="p-6 space-y-4 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Nama Produk / Layanan <span class="text-rose-500">*</span></label>
+          <input type="text" id="prodName" required placeholder="Contoh: Paket Glow Platinum" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Harga Standar (Rp) <span class="text-rose-500">*</span></label>
+          <input type="number" id="prodPrice" required placeholder="250000" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Kategori Produk</label>
+          <input type="text" id="prodCategory" placeholder="Contoh: Skincare, Essential Oil, Aksesoris" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500">
+        </div>
+
+        <div class="flex justify-end space-x-3 pt-3 border-t border-slate-200">
+          <button type="button" onclick="closeProductModal()" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-100 font-medium">Batal</button>
+          <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow-md">Simpan Produk</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT APP LOGIC -->
+  <script>
+    let activeUser = 'Admin';
+    let gsheetWebhookUrl = localStorage.getItem('nexus_gsheet_url') || '';
+    let autoSyncEnabled = localStorage.getItem('nexus_auto_sync') === 'true';
+
+    let defaultProducts = [
+      { id: 'p1', name: 'Signature Body Butter 5 gr', price: 25000, category: 'Body Care' },
+      { id: 'p2', name: 'Signature Body Butter 50 gr', price: 194000, category: 'Body Care' },
+      { id: 'p3', name: 'Signature Body Butter 75 gr', price: 279000, category: 'Body Care' },
+      { id: 'p4', name: 'Signature Deodorant 30 gr', price: 148000, category: 'Body Care' },
+      { id: 'p5', name: 'Signature Deodorant 5 gr', price: 25000, category: 'Body Care' },
+      { id: 'p6', name: 'Hydro Body Serum 180 ml', price: 189000, category: 'Body Care' },
+      { id: 'p7', name: 'Ocean Pure 100 ml', price: 179000, category: 'Body Care' },
+      { id: 'p8', name: 'Botanical Hair Mask 100 gr', price: 182000, category: 'Hair Care' },
+      { id: 'p9', name: 'Frizz Away Shampoo 30 ml', price: 35000, category: 'Hair Care' },
+      { id: 'p10', name: 'Frizz Away Shampoo 180 ml', price: 197000, category: 'Hair Care' },
+      { id: 'p11', name: 'Frizz Away Shampoo 450 ml', price: 384000, category: 'Hair Care' },
+      { id: 'p12', name: 'Gentle and Mild Head To Toe Wash 30 ml', price: 35000, category: 'Body Care' },
+      { id: 'p13', name: 'Gentle and Mild Head To Toe Wash 180 ml', price: 197000, category: 'Body Care' },
+      { id: 'p14', name: 'Gentle and Mild Head To Toe Wash 450 ml', price: 384000, category: 'Body Care' },
+      { id: 'p15', name: 'Moisturizing Stick 10gr', price: 50000, category: 'Skincare' },
+      { id: 'p16', name: 'Signature Coffe Scrub 95 gr', price: 172000, category: 'Body Care' },
+      { id: 'p17', name: 'Eo Pure - Warm Hug', price: 130000, category: 'Essential Oil' },
+      { id: 'p18', name: 'Eo Pure - Inner Peace', price: 130000, category: 'Essential Oil' },
+      { id: 'p19', name: 'Eo Pure - Be Brave', price: 130000, category: 'Essential Oil' },
+      { id: 'p20', name: 'Eo Pure - Mindfullnes', price: 130000, category: 'Essential Oil' },
+      { id: 'p21', name: 'Eo Pure - Quick Joy', price: 130000, category: 'Essential Oil' },
+      { id: 'p22', name: 'Eo Pure - Quick Sleep', price: 130000, category: 'Essential Oil' },
+      { id: 'p23', name: 'Eo Pure - Brain Reset', price: 130000, category: 'Essential Oil' },
+      { id: 'p24', name: 'Eo Pure - Wake Up', price: 130000, category: 'Essential Oil' },
+      { id: 'p25', name: 'Eo Roller- Quick Joy', price: 100000, category: 'Essential Oil' },
+      { id: 'p26', name: 'Eo Roller- Quick sleep', price: 100000, category: 'Essential Oil' },
+      { id: 'p27', name: 'Eo Roller- Be Brave', price: 100000, category: 'Essential Oil' },
+      { id: 'p28', name: 'Eo Roller- Brain Reset', price: 100000, category: 'Essential Oil' },
+      { id: 'p29', name: 'Eo Parfume - Verde Essence Hydro', price: 139000, category: 'Parfume' },
+      { id: 'p30', name: 'Eo Parfume - Jardin Lumiere Hairmask', price: 145000, category: 'Parfume' },
+      { id: 'p31', name: 'Eo Parfum - Divine Resin Frizzy', price: 139000, category: 'Parfume' },
+      { id: 'p32', name: 'Scented Candle', price: 30000, category: 'Aksesoris' },
+      { id: 'p33', name: 'Dompet EO Werkin', price: 100000, category: 'Aksesoris' }
+    ];
+
+    let products = JSON.parse(localStorage.getItem('nexus_products')) || defaultProducts;
+
+    let leads = JSON.parse(localStorage.getItem('nexus_leads')) || [
+      {
+        id: 'L001',
+        date: '2026-08-11',
+        name: 'Cust 6',
+        phone: '+62 857-6414-3226',
+        source: 'WhatsApp',
+        askedProduct: 'Paket Brightening Cream',
+        items: [],
+        globalDiscountType: 'percent',
+        globalDiscountVal: 0,
+        subtotal: 0,
+        totalDiscount: 0,
+        value: 0,
+        stage: 'awareness',
+        pic: 'Yasmin CS',
+        paymentStatus: 'Belum Bayar',
+        notes: 'Inquiry awal mengenai paket pemutih'
+      },
+      {
+        id: 'L002',
+        date: '2026-08-11',
+        name: 'Cust 5',
+        phone: '+62 851-1984-6968',
+        source: 'WhatsApp',
+        askedProduct: 'Serum Acne Relief',
+        items: [],
+        globalDiscountType: 'percent',
+        globalDiscountVal: 0,
+        subtotal: 0,
+        totalDiscount: 0,
+        value: 0,
+        stage: 'awareness',
+        pic: 'Yasmin CS',
+        paymentStatus: 'Belum Bayar',
+        notes: 'Tanya stok jerawat'
+      },
+      {
+        id: 'L003',
+        date: '2026-08-01',
+        name: 'Andi Wijaya',
+        phone: '081234567890',
+        source: 'Instagram',
+        askedProduct: 'Hydro Body Serum 180 ml',
+        items: [{ productName: 'Hydro Body Serum 180 ml', qty: 1, price: 189000, discountType: 'percent', discountVal: 0 }],
+        globalDiscountType: 'percent',
+        globalDiscountVal: 0,
+        subtotal: 189000,
+        totalDiscount: 0,
+        value: 189000,
+        stage: 'conversion',
+        pic: 'Yasmin CS',
+        paymentStatus: 'Lunas',
+        notes: 'Sudah melakukan pembayaran via Transfer BCA'
+      }
+    ];
+
+    let funnelChartInstance = null;
+    let sourceChartInstance = null;
+    let askedProductChartInstance = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('gSheetWebhookUrl').value = gsheetWebhookUrl;
+      document.getElementById('chkAutoSync').checked = autoSyncEnabled;
+      
+      renderProducts();
+      renderAll();
+    });
+
+    function formatRp(val) {
+      return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val || 0);
+    }
+
+    function saveData() {
+      localStorage.setItem('nexus_leads', JSON.stringify(leads));
+      localStorage.setItem('nexus_products', JSON.stringify(products));
+      if (autoSyncEnabled && gsheetWebhookUrl) {
+        syncToGoogleSheets(true);
+      }
+    }
+
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active-tab', 'text-emerald-400', 'bg-slate-900/60', 'font-semibold');
+        btn.classList.add('text-slate-400');
+      });
+
+      document.getElementById(`view-${tabName}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`tab-${tabName}`);
+      activeBtn.classList.add('active-tab', 'text-emerald-400', 'bg-slate-900/60', 'font-semibold');
+      activeBtn.classList.remove('text-slate-400');
+
+      if (tabName === 'dashboard') {
+        renderDashboardCharts();
+      }
+    }
+
+    function changeActiveUser(val) {
+      activeUser = val;
+      renderAll();
+    }
+
+    function getFilteredLeads() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const source = document.getElementById('filterSource').value;
+      const picFilter = document.getElementById('filterPic').value;
+
+      return leads.filter(item => {
+        const matchUser = (activeUser === 'Admin') || (item.pic === activeUser);
+        const matchSearch = item.name.toLowerCase().includes(search) ||
+                            item.phone.includes(search) ||
+                            (item.askedProduct && item.askedProduct.toLowerCase().includes(search)) ||
+                            (item.notes && item.notes.toLowerCase().includes(search));
+        const matchSource = !source || item.source === source;
+        const matchPic = !picFilter || item.pic === picFilter;
+
+        return matchUser && matchSearch && matchSource && matchPic;
+      });
+    }
+
+    function applyFilters() { renderAll(); }
+    function resetFilters() {
+      document.getElementById('searchInput').value = '';
+      document.getElementById('filterSource').value = '';
+      document.getElementById('filterPic').value = '';
+      renderAll();
+    }
+
+    function renderAll() {
+      const filtered = getFilteredLeads();
+      renderKanban(filtered);
+      renderTable(filtered);
+      renderNotifications();
+      renderDashboardStats(filtered);
+    }
+
+    /* KANBAN RENDER */
+    function renderKanban(data) {
+      const stages = ['awareness', 'consideration', 'conversion', 'retention', 'advocacy'];
+      stages.forEach(st => {
+        const colEl = document.getElementById(`col-${st}`);
+        colEl.innerHTML = '';
+        const stageItems = data.filter(d => d.stage === st);
+        document.getElementById(`count-${st}`).innerText = stageItems.length;
+
+        let totalVal = 0;
+        stageItems.forEach(item => {
+          totalVal += Number(item.value || 0);
+          colEl.appendChild(createKanbanCard(item));
+        });
+        document.getElementById(`total-${st}`).innerText = formatRp(totalVal);
+      });
+    }
+
+    function createKanbanCard(item) {
+      const card = document.createElement('div');
+      card.className = 'bg-white p-3 rounded-xl border border-slate-200 shadow-sm cursor-grab active:cursor-grabbing hover:shadow-md transition relative group';
+      card.draggable = true;
+      card.dataset.id = item.id;
+
+      card.ondragstart = (e) => {
+        e.dataTransfer.setData('text/plain', item.id);
+        card.classList.add('dragging');
+      };
+      card.ondragend = () => card.classList.remove('dragging');
+
+      const cleanPhone = item.phone.replace(/[^0-9]/g, '');
+      const waLink = `https://wa.me/${cleanPhone}`;
+      const boughtSummary = item.items && item.items.length > 0 
+        ? item.items.map(i => `${i.productName} (x${i.qty})`).join(', ')
+        : (item.productBought || '');
+
+      card.innerHTML = `
+        <div class="flex justify-between items-start mb-1.5">
+          <span class="font-bold text-slate-800 text-xs truncate max-w-[130px]">${item.name}</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-slate-100 text-slate-600">${item.source}</span>
+        </div>
+
+        <div class="text-[11px] text-amber-800 bg-amber-50 rounded px-2 py-1 mb-2 font-medium border border-amber-100/60 truncate" title="Produk Diminati">
+          <i class="fa-solid fa-heart text-amber-500 mr-1"></i> ${item.askedProduct || 'Belum diisi'}
+        </div>
+
+        ${boughtSummary ? `
+          <div class="text-[11px] text-emerald-700 bg-emerald-50 rounded px-2 py-1 mb-2 font-semibold border border-emerald-100 truncate" title="Produk Dibeli">
+            <i class="fa-solid fa-bag-shopping text-emerald-500 mr-1"></i> ${boughtSummary}
+          </div>
+        ` : `
+          <div class="text-[11px] text-slate-400 bg-slate-50 rounded px-2 py-1 mb-2 italic border border-slate-100">
+            Tidak ada produk dibeli
+          </div>
+        `}
+
+        <div class="flex items-center justify-between text-[11px] pt-1 border-t border-slate-100 text-slate-500">
+          <span class="font-bold text-slate-700">${item.value ? formatRp(item.value) : 'Rp 0'}</span>
+          <span class="text-[10px] text-slate-400">${item.pic}</span>
+        </div>
+
+        <div class="mt-2.5 flex justify-between items-center text-[10px] pt-1">
+          <a href="${waLink}" target="_blank" class="text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-1">
+            <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.842-1.001z"/></svg>
+            ${item.phone}
+          </a>
+          <div class="space-x-1">
+            <button onclick="editLead('${item.id}')" class="text-slate-400 hover:text-slate-700 p-1"><i class="fa-solid fa-pen-to-square"></i></button>
+            <button onclick="deleteLead('${item.id}')" class="text-slate-400 hover:text-rose-600 p-1"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        </div>
+      `;
+      return card;
+    }
+
+    function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+    function handleDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+    function handleDrop(e) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('drag-over');
+      const id = e.dataTransfer.getData('text/plain');
+      const targetStage = e.currentTarget.dataset.stage;
+      const lead = leads.find(l => l.id === id);
+      if (lead && lead.stage !== targetStage) {
+        lead.stage = targetStage;
+        saveData();
+        renderAll();
+      }
+    }
+
+    /* TABLE RENDER */
+    function renderTable(data) {
+      const tbody = document.getElementById('leadTableBody');
+      tbody.innerHTML = '';
+      document.getElementById('tableRecordCount').innerText = data.length;
+
+      data.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition border-b border-slate-100';
+
+        const boughtSummary = item.items && item.items.length > 0 
+          ? item.items.map(i => `${i.productName} (${i.qty}x)`).join(', ')
+          : (item.productBought || 'Tidak ada produk');
+
+        const cleanPhone = item.phone.replace(/[^0-9]/g, '');
+        const waLink = `https://wa.me/${cleanPhone}`;
+
+        tr.innerHTML = `
+          <td class="py-3 px-4 text-slate-500 font-medium">${item.date}</td>
+          <td class="py-3 px-4 font-bold text-slate-900">${item.name}</td>
+          <td class="py-3 px-4">
+            <a href="${waLink}" target="_blank" class="inline-flex items-center gap-1 text-emerald-600 hover:underline font-medium">
+              <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.842-1.001z"/></svg>
+              ${item.phone}
+            </a>
+          </td>
+          <td class="py-3 px-4">
+            <span class="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md text-[11px] font-semibold">${item.source}</span>
+          </td>
+          <!-- KOLOM BARU: PRODUK DIMINATI -->
+          <td class="py-3 px-4 font-semibold text-slate-800">${item.askedProduct || '-'}</td>
+          <td class="py-3 px-4 text-slate-500 font-medium">${boughtSummary}</td>
+          <td class="py-3 px-4 text-right font-semibold text-rose-600">- ${formatRp(item.totalDiscount || 0)}</td>
+          <td class="py-3 px-4 text-right font-semibold text-slate-900">${formatRp(item.value || 0)}</td>
+          <td class="py-3 px-4">
+            <span class="bg-sky-100 text-sky-700 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wide uppercase">${item.stage}</span>
+          </td>
+          <td class="py-3 px-4 text-slate-600 font-medium">${item.pic}</td>
+          <td class="py-3 px-4 text-center space-x-1">
+            <button onclick="editLead('${item.id}')" class="text-slate-500 hover:text-slate-800 p-1"><i class="fa-solid fa-pen-to-square"></i></button>
+            <button onclick="deleteLead('${item.id}')" class="text-slate-500 hover:text-rose-600 p-1"><i class="fa-solid fa-trash"></i></button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    /* MULTI-PRODUCT ITEM & CALCULATOR LOGIC */
+    function addProductRow(data = null) {
+      const container = document.getElementById('productRowsContainer');
+      const rowId = 'row_' + Date.now() + Math.floor(Math.random() * 1000);
+      
+      let optionsHtml = `<option value="">-- Pilih Produk --</option>`;
+      products.forEach(p => {
+        optionsHtml += `<option value="${p.name}" data-price="${p.price}">${p.name} (${formatRp(p.price)})</option>`;
+      });
+
+      const row = document.createElement('div');
+      row.className = 'product-row flex flex-wrap sm:flex-nowrap items-center gap-2 bg-white p-2.5 rounded-lg border border-slate-200';
+      row.id = rowId;
+
+      row.innerHTML = `
+        <div class="flex-1 min-w-[180px]">
+          <select onchange="onSelectProductRow(this)" class="row-product-select w-full px-2 py-1.5 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-emerald-500">
+            ${optionsHtml}
+          </select>
+        </div>
+        <div class="w-16">
+          <input type="number" min="1" value="${data ? data.qty : 1}" oninput="calculateCart()" class="row-qty w-full px-2 py-1.5 border border-slate-300 rounded text-xs text-center" placeholder="Qty">
+        </div>
+        <div class="w-28">
+          <input type="number" value="${data ? data.price : 0}" oninput="calculateCart()" class="row-price w-full px-2 py-1.5 border border-slate-300 rounded text-xs text-right bg-slate-50" placeholder="Harga">
+        </div>
+        <div class="w-32 flex space-x-1">
+          <select onchange="calculateCart()" class="row-discount-type px-1 py-1.5 border border-slate-300 rounded text-[11px] bg-slate-50">
+            <option value="percent" ${data && data.discountType === 'percent' ? 'selected' : ''}>%</option>
+            <option value="nominal" ${data && data.discountType === 'nominal' ? 'selected' : ''}>Rp</option>
+          </select>
+          <input type="number" min="0" value="${data ? data.discountVal : 0}" oninput="calculateCart()" class="row-discount-val w-full px-1.5 py-1.5 border border-slate-300 rounded text-xs text-center" placeholder="Diskon">
+        </div>
+        <div class="w-28 text-right font-bold text-slate-700 text-xs px-1">
+          <span class="row-subtotal-display">Rp 0</span>
+        </div>
+        <button type="button" onclick="removeProductRow('${rowId}')" class="text-rose-500 hover:text-rose-700 p-1">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      `;
+
+      container.appendChild(row);
+
+      if (data) {
+        const select = row.querySelector('.row-product-select');
+        select.value = data.productName;
+      }
+
+      calculateCart();
+    }
+
+    function removeProductRow(rowId) {
+      const row = document.getElementById(rowId);
+      if (row) row.remove();
+      calculateCart();
+    }
+
+    function onSelectProductRow(selectEl) {
+      const row = selectEl.closest('.product-row');
+      const selectedOpt = selectEl.options[selectEl.selectedIndex];
+      const price = selectedOpt.getAttribute('data-price') || 0;
+      row.querySelector('.row-price').value = price;
+      calculateCart();
+    }
+
+    function calculateCart() {
+      let subtotal = 0;
+      let totalItemDiscount = 0;
+
+      document.querySelectorAll('.product-row').forEach(row => {
+        const qty = parseFloat(row.querySelector('.row-qty').value) || 0;
+        const price = parseFloat(row.querySelector('.row-price').value) || 0;
+        const discType = row.querySelector('.row-discount-type').value;
+        const discVal = parseFloat(row.querySelector('.row-discount-val').value) || 0;
+
+        const baseTotal = qty * price;
+        let itemDiscount = 0;
+
+        if (discType === 'percent') {
+          itemDiscount = baseTotal * (discVal / 100);
+        } else {
+          itemDiscount = discVal * qty;
+        }
+
+        const netItem = baseTotal - itemDiscount;
+        row.querySelector('.row-subtotal-display').innerText = formatRp(netItem);
+
+        subtotal += baseTotal;
+        totalItemDiscount += itemDiscount;
+      });
+
+      const globalDiscType = document.getElementById('globalDiscountType').value;
+      const globalDiscVal = parseFloat(document.getElementById('globalDiscountVal').value) || 0;
+
+      const totalAfterItemDisc = subtotal - totalItemDiscount;
+      let globalDiscount = 0;
+
+      if (globalDiscType === 'percent') {
+        globalDiscount = totalAfterItemDisc * (globalDiscVal / 100);
+      } else {
+        globalDiscount = globalDiscVal;
+      }
+
+      const grandTotalDiscount = totalItemDiscount + globalDiscount;
+      const finalNett = subtotal - grandTotalDiscount;
+
+      document.getElementById('displaySubtotal').innerText = formatRp(subtotal);
+      document.getElementById('displayTotalDiscount').innerText = '- ' + formatRp(grandTotalDiscount);
+      document.getElementById('displayFinalNett').innerText = formatRp(finalNett < 0 ? 0 : finalNett);
+    }
+
+    function getCartData() {
+      const items = [];
+      document.querySelectorAll('.product-row').forEach(row => {
+        const prodName = row.querySelector('.row-product-select').value;
+        if (prodName) {
+          items.push({
+            productName: prodName,
+            qty: parseFloat(row.querySelector('.row-qty').value) || 1,
+            price: parseFloat(row.querySelector('.row-price').value) || 0,
+            discountType: row.querySelector('.row-discount-type').value,
+            discountVal: parseFloat(row.querySelector('.row-discount-val').value) || 0
+          });
+        }
+      });
+      return items;
+    }
+
+    /* LEAD MODAL CONTROL */
+    function openLeadModal() {
+      document.getElementById('leadForm').reset();
+      document.getElementById('leadId').value = '';
+      document.getElementById('leadDate').value = new Date().toISOString().split('T')[0];
+      document.getElementById('productRowsContainer').innerHTML = '';
+      document.getElementById('modalLeadTitle').innerText = 'Input Data Lead / Customer Baru';
+      
+      calculateCart();
+      document.getElementById('leadModal').classList.remove('hidden');
+    }
+
+    function closeLeadModal() {
+      document.getElementById('leadModal').classList.add('hidden');
+    }
+
+    function saveLead(e) {
+      e.preventDefault();
+      const id = document.getElementById('leadId').value;
+      const items = getCartData();
+
+      // Recalculate totals for payload
+      let subtotal = 0;
+      let itemDisc = 0;
+      items.forEach(i => {
+        const base = i.qty * i.price;
+        subtotal += base;
+        itemDisc += i.discountType === 'percent' ? base * (i.discountVal / 100) : i.discountVal * i.qty;
+      });
+
+      const globalType = document.getElementById('globalDiscountType').value;
+      const globalVal = parseFloat(document.getElementById('globalDiscountVal').value) || 0;
+      const globalDisc = globalType === 'percent' ? (subtotal - itemDisc) * (globalVal / 100) : globalVal;
+
+      const totalDiscount = itemDisc + globalDisc;
+      const finalNett = Math.max(0, subtotal - totalDiscount);
+
+      const leadData = {
+        id: id || 'L' + Date.now(),
+        date: document.getElementById('leadDate').value,
+        name: document.getElementById('leadName').value,
+        phone: document.getElementById('leadPhone').value,
+        askedProduct: document.getElementById('leadAskedProduct').value,
+        items: items,
+        globalDiscountType: globalType,
+        globalDiscountVal: globalVal,
+        subtotal: subtotal,
+        totalDiscount: totalDiscount,
+        value: finalNett,
+        source: document.getElementById('leadSource').value,
+        pic: document.getElementById('leadPic').value,
+        stage: document.getElementById('leadStage').value,
+        paymentStatus: document.getElementById('leadPaymentStatus').value,
+        notes: document.getElementById('leadNotes').value
+      };
+
+      if (id) {
+        const idx = leads.findIndex(l => l.id === id);
+        if (idx !== -1) leads[idx] = leadData;
+      } else {
+        leads.unshift(leadData);
+      }
+
+      saveData();
+      renderAll();
+      closeLeadModal();
+    }
+
+    function editLead(id) {
+      const item = leads.find(l => l.id === id);
+      if (!item) return;
+
+      document.getElementById('leadId').value = item.id;
+      document.getElementById('leadDate').value = item.date;
+      document.getElementById('leadName').value = item.name;
+      document.getElementById('leadPhone').value = item.phone;
+      document.getElementById('leadAskedProduct').value = item.askedProduct || '';
+      document.getElementById('leadSource').value = item.source;
+      document.getElementById('leadPic').value = item.pic;
+      document.getElementById('leadStage').value = item.stage;
+      document.getElementById('leadPaymentStatus').value = item.paymentStatus || 'Belum Bayar';
+      document.getElementById('leadNotes').value = item.notes || '';
+
+      document.getElementById('globalDiscountType').value = item.globalDiscountType || 'percent';
+      document.getElementById('globalDiscountVal').value = item.globalDiscountVal || 0;
+
+      const container = document.getElementById('productRowsContainer');
+      container.innerHTML = '';
+
+      if (item.items && item.items.length > 0) {
+        item.items.forEach(prodItem => addProductRow(prodItem));
+      } else if (item.productBought) {
+        addProductRow({
+          productName: item.productBought,
+          qty: 1,
+          price: item.value || 0,
+          discountType: 'percent',
+          discountVal: 0
+        });
+      }
+
+      document.getElementById('modalLeadTitle').innerText = 'Edit Data Lead';
+      calculateCart();
+      document.getElementById('leadModal').classList.remove('hidden');
+    }
+
+    function deleteLead(id) {
+      if (confirm('Apakah Anda yakin ingin menghapus data lead ini?')) {
+        leads = leads.filter(l => l.id !== id);
+        saveData();
+        renderAll();
+      }
+    }
+
+    /* NOTIFICATION & STALE LEADS */
+    function renderNotifications() {
+      const notifList = document.getElementById('notifList');
+      const badge = document.getElementById('notifBadge');
+      const countText = document.getElementById('notifCountText');
+
+      notifList.innerHTML = '';
+      const now = new Date();
+
+      const staleLeads = leads.filter(item => {
+        if (item.stage === 'conversion' || item.stage === 'retention') return false;
+        const leadDate = new Date(item.date);
+        return Math.floor((now - leadDate) / (1000 * 60 * 60 * 24)) >= 3;
+      });
+
+      if (staleLeads.length > 0) {
+        badge.innerText = staleLeads.length;
+        badge.classList.remove('hidden');
+        countText.innerText = `${staleLeads.length} Lead Stagnan`;
+
+        staleLeads.forEach(item => {
+          const div = document.createElement('div');
+          div.className = 'p-3 hover:bg-slate-50 flex justify-between items-center';
+          div.innerHTML = `
+            <div>
+              <p class="font-bold text-slate-800">${item.name} (${item.pic})</p>
+              <p class="text-[11px] text-slate-500">Minat: ${item.askedProduct || '-'}</p>
+              <p class="text-[10px] text-amber-600 mt-0.5"><i class="fa-solid fa-clock mr-1"></i> Belum ada update >3 hari</p>
+            </div>
+            <button onclick="editLead('${item.id}')" class="px-2.5 py-1 bg-amber-500 text-white text-[10px] rounded font-semibold hover:bg-amber-600">Follow Up</button>
+          `;
+          notifList.appendChild(div);
+        });
+      } else {
+        badge.classList.add('hidden');
+        countText.innerText = `0 Lead Stagnan`;
+        notifList.innerHTML = `<div class="p-4 text-center text-slate-400 italic">Semua follow up teratur! Tidak ada lead stagnan.</div>`;
+      }
+    }
+
+    function toggleNotifDropdown() {
+      document.getElementById('notifDropdown').classList.toggle('hidden');
+    }
+
+    /* DASHBOARD & CHARTS */
+    function renderDashboardStats(data) {
+      document.getElementById('statTotalLeads').innerText = data.length;
+
+      const closingLeads = data.filter(d => d.stage === 'conversion' || d.stage === 'retention' || d.stage === 'advocacy');
+      const totalSales = closingLeads.reduce((acc, curr) => acc + Number(curr.value || 0), 0);
+      document.getElementById('statTotalSales').innerText = formatRp(totalSales);
+
+      const convRate = data.length > 0 ? ((closingLeads.length / data.length) * 100).toFixed(1) : 0;
+      document.getElementById('statConversionRate').innerText = `${convRate}%`;
+
+      const now = new Date();
+      const staleCount = data.filter(item => {
+        if (item.stage === 'conversion' || item.stage === 'retention') return false;
+        const leadDate = new Date(item.date);
+        return Math.floor((now - leadDate) / (1000 * 60 * 60 * 24)) >= 3;
+      }).length;
+
+      document.getElementById('statStaleLeads').innerText = staleCount;
+    }
+
+    function renderDashboardCharts() {
+      const data = getFilteredLeads();
+
+      // Chart 1: Funnel
+      const stages = ['awareness', 'consideration', 'conversion', 'retention', 'advocacy'];
+      const funnelCounts = stages.map(st => data.filter(d => d.stage === st).length);
+
+      if (funnelChartInstance) funnelChartInstance.destroy();
+      const ctx1 = document.getElementById('funnelChart').getContext('2d');
+      funnelChartInstance = new Chart(ctx1, {
+        type: 'bar',
+        data: {
+          labels: ['1. Awareness', '2. Consideration', '3. Conversion', '4. Retention', '5. Advocacy'],
+          datasets: [{
+            label: 'Jumlah Lead',
+            data: funnelCounts,
+            backgroundColor: ['#0ea5e9', '#f59e0b', '#10b981', '#6366f1', '#f43f5e'],
+            borderRadius: 6
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+      });
+
+      // Chart 2: Source Revenue
+      const sources = ['Instagram', 'WhatsApp', 'Website', 'Referral', 'Marketplace', 'Lainnya'];
+      const sourceRevenues = sources.map(src => {
+        return data.filter(d => d.source === src).reduce((acc, curr) => acc + Number(curr.value || 0), 0);
+      });
+
+      if (sourceChartInstance) sourceChartInstance.destroy();
+      const ctx2 = document.getElementById('sourceChart').getContext('2d');
+      sourceChartInstance = new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+          labels: sources,
+          datasets: [{
+            data: sourceRevenues,
+            backgroundColor: ['#e11d48', '#22c55e', '#3b82f6', '#a855f7', '#f97316', '#64748b']
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      // Chart 3: Asked Products (Produk Diminati)
+      const askedMap = {};
+      data.forEach(item => {
+        if (item.askedProduct) {
+          askedMap[item.askedProduct] = (askedMap[item.askedProduct] || 0) + 1;
+        }
+      });
+
+      if (askedProductChartInstance) askedProductChartInstance.destroy();
+      const ctx3 = document.getElementById('askedProductChart').getContext('2d');
+      askedProductChartInstance = new Chart(ctx3, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(askedMap).length ? Object.keys(askedMap) : ['Belum Ada Data'],
+          datasets: [{
+            label: 'Frekuensi Diminati Customer',
+            data: Object.values(askedMap).length ? Object.values(askedMap) : [0],
+            backgroundColor: '#f59e0b',
+            borderRadius: 6
+          }]
+        },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+      });
+
+      // Ranking Top Products
+      const soldMap = {};
+      data.forEach(item => {
+        if (item.items && item.items.length > 0) {
+          item.items.forEach(i => {
+            if (!soldMap[i.productName]) soldMap[i.productName] = { qty: 0, revenue: 0 };
+            soldMap[i.productName].qty += i.qty;
+            soldMap[i.productName].revenue += (i.qty * i.price);
+          });
+        }
+      });
+
+      const sortedProducts = Object.keys(soldMap).map(k => ({
+        name: k,
+        qty: soldMap[k].qty,
+        revenue: soldMap[k].revenue
+      })).sort((a, b) => b.qty - a.qty);
+
+      const topTbody = document.getElementById('topProductsBody');
+      topTbody.innerHTML = '';
+      if (sortedProducts.length === 0) {
+        topTbody.innerHTML = `<tr><td colspan="4" class="py-4 text-center text-slate-400">Belum ada transaksi closing terdata</td></tr>`;
+      } else {
+        sortedProducts.forEach((prod, index) => {
+          const tr = document.createElement('tr');
+          tr.className = 'border-b border-slate-100 hover:bg-slate-50';
+          tr.innerHTML = `
+            <td class="py-2.5 px-4 font-bold text-slate-500">${index + 1}</td>
+            <td class="py-2.5 px-4 font-semibold text-slate-800">${prod.name}</td>
+            <td class="py-2.5 px-4 text-center font-bold text-emerald-600">${prod.qty}</td>
+            <td class="py-2.5 px-4 text-right font-bold text-slate-800">${formatRp(prod.revenue)}</td>
+          `;
+          topTbody.appendChild(tr);
+        });
+      }
+    }
+
+    /* PRODUCT CATALOG MANAGEMENT */
+    function renderProducts() {
+      const grid = document.getElementById('productListGrid');
+      grid.innerHTML = '';
+
+      products.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between hover:shadow-sm transition';
+        div.innerHTML = `
+          <div>
+            <div class="flex justify-between items-start mb-2">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">${p.category || 'Umum'}</span>
+              <button onclick="deleteProduct('${p.id}')" class="text-slate-400 hover:text-rose-600 text-xs"><i class="fa-solid fa-trash"></i></button>
+            </div>
+            <h4 class="font-bold text-slate-800 text-sm">${p.name}</h4>
+          </div>
+          <div class="mt-4 pt-2 border-t border-slate-200 flex justify-between items-center">
+            <span class="text-xs text-slate-500">Harga Standar</span>
+            <span class="font-bold text-slate-800 text-xs">${formatRp(p.price)}</span>
+          </div>
+        `;
+        grid.appendChild(div);
+      });
+    }
+
+    function openAddProductModal() {
+      document.getElementById('productForm').reset();
+      document.getElementById('productModal').classList.remove('hidden');
+    }
+
+    function closeProductModal() {
+      document.getElementById('productModal').classList.add('hidden');
+    }
+
+    function saveProduct(e) {
+      e.preventDefault();
+      const newP = {
+        id: 'p' + Date.now(),
+        name: document.getElementById('prodName').value,
+        price: Number(document.getElementById('prodPrice').value),
+        category: document.getElementById('prodCategory').value || 'Umum'
+      };
+
+      products.push(newP);
+      saveData();
+      renderProducts();
+      closeProductModal();
+    }
+
+    function deleteProduct(id) {
+      if (confirm('Hapus produk ini dari katalog?')) {
+        products = products.filter(p => p.id !== id);
+        saveData();
+        renderProducts();
+      }
+    }
+
+    /* GOOGLE SHEETS & EXPORT/IMPORT */
+    function saveGSheetUrl() {
+      const url = document.getElementById('gSheetWebhookUrl').value.trim();
+      localStorage.setItem('nexus_gsheet_url', url);
+      gsheetWebhookUrl = url;
+      alert('URL Webhook Google Sheets berhasil disimpan!');
+    }
+
+    function toggleAutoSync(val) {
+      autoSyncEnabled = val;
+      localStorage.setItem('nexus_auto_sync', val);
+    }
+
+    async function syncToGoogleSheets(silent = false) {
+      if (!gsheetWebhookUrl) {
+        if (!silent) alert('Silakan masukkan dan simpan URL Webhook Google Apps Script lebih dahulu!');
+        return;
+      }
+
+      const statusEl = document.getElementById('gsheetSyncStatus');
+      if (statusEl) statusEl.innerText = 'Status: Mengirim data ke Google Sheets...';
+
+      try {
+        await fetch(gsheetWebhookUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'push', data: leads })
+        });
+        if (statusEl) statusEl.innerText = 'Status: Terakhir tersinkronisasi (Push) pada ' + new Date().toLocaleTimeString();
+        if (!silent) alert('Data berhasil terkirim ke Google Sheets!');
+      } catch (err) {
+        if (statusEl) statusEl.innerText = 'Status: Gagal Sinkronisasi';
+        if (!silent) alert('Gagal terhubung ke Google Sheets Webhook!');
+      }
+    }
+
+    async function pullFromGoogleSheets() {
+      if (!gsheetWebhookUrl) {
+        alert('Silakan masukkan URL Webhook Google Apps Script lebih dahulu!');
+        return;
+      }
+
+      const statusEl = document.getElementById('gsheetSyncStatus');
+      if (statusEl) statusEl.innerText = 'Status: Menarik data terbaru...';
+
+      try {
+        const res = await fetch(`${gsheetWebhookUrl}?action=pull`);
+        const json = await res.json();
+        if (json && Array.isArray(json.data)) {
+          leads = json.data;
+          saveData();
+          renderAll();
+          if (statusEl) statusEl.innerText = 'Status: Terakhir diperbarui (Pull) pada ' + new Date().toLocaleTimeString();
+          alert('Data berhasil diperbarui dari Google Sheets!');
+        }
+      } catch (err) {
+        if (statusEl) statusEl.innerText = 'Status: Gagal menarik data';
+        alert('Gagal mengambil data dari Google Sheets! Pastikan script mengembalikan JSON valid.');
+      }
+    }
+
+    function exportToExcel() {
+      const dataToExport = getFilteredLeads();
+      const ws = XLSX.utils.json_to_sheet(dataToExport);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Leads Data");
+      XLSX.writeFile(wb, `NexusCRM_Leads_${new Date().toISOString().split('T')[0]}.xlsx`);
+    }
+
+    function exportToCSV() {
+      const dataToExport = getFilteredLeads();
+      const csv = Papa.unparse(dataToExport);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+      link.setAttribute("href", url);
+      link.setAttribute("download", `NexusCRM_Leads_${new Date().toISOString().split('T')[0]}.csv`);
+      link.click();
+    }
+
+    function handleFileImport(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      const ext = file.name.split('.').pop().toLowerCase();
+
+      if (ext === 'csv') {
+        Papa.parse(file, {
+          header: true,
+          complete: function(results) { mergeImportedData(results.data); }
+        });
+      } else {
+        reader.onload = function(evt) {
+          const data = new Uint8Array(evt.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.SheetNames[0];
+          const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[firstSheet]);
+          mergeImportedData(jsonData);
+        };
+        reader.readAsArrayBuffer(file);
+      }
+    }
+
+    function mergeImportedData(importedItems) {
+      let count = 0;
+      importedItems.forEach(row => {
+        if (row.name || row.Nama || row['Nama Pelanggan']) {
+          leads.push({
+            id: 'L' + Date.now() + Math.floor(Math.random()*1000),
+            date: row.date || row.Tanggal || new Date().toISOString().split('T')[0],
+            name: row.name || row.Nama || row['Nama Pelanggan'],
+            phone: String(row.phone || row.HP || row.WhatsApp || ''),
+            askedProduct: row.askedProduct || row['Produk Diminati'] || row['Produk Ditanya'] || '',
+            items: [],
+            globalDiscountType: 'percent',
+            globalDiscountVal: 0,
+            subtotal: Number(row.value || row.Harga || row.Total || 0),
+            totalDiscount: 0,
+            value: Number(row.value || row.Harga || row.Total || 0),
+            source: row.source || row.Sumber || 'Import',
+            pic: row.pic || row.PIC || activeUser,
+            stage: row.stage || row.Stage || 'awareness',
+            paymentStatus: row.paymentStatus || 'Belum Bayar',
+            notes: row.notes || row.Catatan || 'Bulk Imported'
+          });
+          count++;
+        }
+      });
+
+      saveData();
+      renderAll();
+      alert(`Berhasil mengimpor ${count} data lead baru!`);
+    }
+  </script>
+</body>
+</html>
